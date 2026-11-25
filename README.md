@@ -170,6 +170,10 @@ not), and `--search` (the MKL and oneAPI runtime DLLs are not on the default sea
 An engine component needs `strata.exe`, `strata-device.exe` and `strata-vision.exe` together; the
 client refuses a package missing any of the three.
 
+A built 0.1.68 package is attached to the
+[releases page](https://github.com/vigaice/strata-sycl-windows/releases), so building is only needed to
+change something. It is signed with a local key; see *Known limits*.
+
 ### The `strata_control` dependency
 
 `package_engine.py` and `feed_tool.py` import `strata_control`, which lives in upstream's `terminal/`

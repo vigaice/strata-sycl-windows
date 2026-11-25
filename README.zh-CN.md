@@ -154,6 +154,9 @@ python tools\packaging\package_engine.py --verify out\engine\0.1.68-windows-x86_
 
 一个引擎组件必须同时具备 `strata.exe`、`strata-device.exe`、`strata-vision.exe`，缺任一个客户端都不收。
 
+0.1.68 的构建产物作为附件放在[发布页](https://github.com/vigaice/strata-sycl-windows/releases)，只有需要
+改动时才要自己构建。该包用本机密钥签名，说明见「已知限制」。
+
 ### `strata_control` 依赖
 
 `package_engine.py` 与 `feed_tool.py` 都导入 `strata_control`，该包位于上游的 `terminal/`，不在本分支内。
