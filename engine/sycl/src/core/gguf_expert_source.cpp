@@ -8,7 +8,25 @@
 #include <cstring>
 #include <utility>
 #include <fcntl.h>
+#ifdef _WIN32
+// STRATA_WINDOWS_PATCH: map the POSIX file calls used below to the MSVC CRT.
+#include <io.h>
+#include <windows.h>
+typedef SSIZE_T ssize_t;   // MSVC CRT has no POSIX ssize_t
+static inline int strata_open(const char* p) { return _open(p, _O_RDONLY | _O_BINARY); }
+static inline int strata_close(int fd) { return _close(fd); }
+static inline ssize_t strata_pread(int fd, void* buf, size_t n, int64_t off) {
+    if (_lseeki64(fd, off, SEEK_SET) == -1) return -1;
+    return _read(fd, buf, (unsigned int) n);
+}
+#else
 #include <unistd.h>
+static inline int strata_open(const char* p) { return ::open(p, O_RDONLY | O_CLOEXEC); }
+static inline int strata_close(int fd) { return ::close(fd); }
+static inline ssize_t strata_pread(int fd, void* buf, size_t n, int64_t off) {
+    return ::pread(fd, buf, n, (off_t) off);
+}
+#endif
 #include <dpct/dpct.hpp>
 #include <sycl/sycl.hpp>
 #include <thread>
@@ -29,7 +47,7 @@ void GgufExpertSource::close() {
     for (uint8_t* c : mirror_chunks_) if (c) sycl::free(c, dpct::get_in_order_queue());
     mirror_chunks_.clear();
     mirror_bytes_ = 0; mirror_ptr_.clear(); layer_first_.clear();
-    for (int fd : fds_) if (fd >= 0) ::close(fd);
+    for (int fd : fds_) if (fd >= 0) strata_close(fd);
     fds_.clear(); names_.clear(); layer_fd_.clear(); ring_.clear(); ring_key_.clear(); where_.clear();
     ring_next_ = 0;
 }
@@ -73,7 +91,7 @@ int GgufExpertSource::fd_of(int64_t layer, int role, std::string& err) {
     if (lay.gguf_file.size() > i && !lay.gguf_file[i].empty()) name = dir_ + lay.gguf_file[i];
     for (size_t k = 0; k < names_.size(); ++k)
         if (names_[k] == name) { layer_fd_[i] = (int) k; return fds_[k]; }
-    const int fd = ::open(name.c_str(), O_RDONLY | O_CLOEXEC);
+    const int fd = strata_open(name.c_str());
     if (fd < 0) { err = "--stream-experts: cannot open " + name; return -1; }
     names_.push_back(name);
     fds_.push_back(fd);
@@ -111,7 +129,7 @@ const uint8_t* GgufExpertSource::blob(int64_t layer, int64_t expert) {
         const uint64_t src = lay.gguf_off[(size_t) (3 * layer + r)] + per[r] * (uint64_t) expert;
         uint64_t done = 0;
         while (done < per[r]) {
-            const ssize_t n = ::pread(fd, buf.data() + at[r] + done, (size_t) (per[r] - done), (off_t) (src + done));
+            const ssize_t n = strata_pread(fd, buf.data() + at[r] + done, (size_t) (per[r] - done), (int64_t) (src + done));
             if (n <= 0) { std::lock_guard<std::mutex> lk(mu_); where_.erase(key); ring_key_[slot] = -1; return nullptr; }
             done += (uint64_t) n;
         }
@@ -234,7 +252,7 @@ bool GgufExpertSource::read_into(int64_t layer, int64_t expert, uint8_t* dst, si
         const uint64_t src = lay.gguf_off[(size_t) (3 * layer + r)] + per[r] * (uint64_t) expert;
         uint64_t done = 0;
         while (done < per[r]) {
-            const ssize_t n = ::pread(fd, dst + at[r] + done, (size_t) (per[r] - done), (off_t) (src + done));
+            const ssize_t n = strata_pread(fd, dst + at[r] + done, (size_t) (per[r] - done), (int64_t) (src + done));
             if (n <= 0) return false;
             done += (uint64_t) n;
         }

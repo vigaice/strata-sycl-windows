@@ -20,6 +20,14 @@ else()
 endif()
 project(strata_sycl VERSION ${STRATA_SYCL_VERSION} LANGUAGES C CXX)
 set(STRATA_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
+# STRATA_WINDOWS_PATCH: DPC++ rejects /MT with -fsycl; bundle the dynamic CRT.
+if(STRATA_PORTABLE AND MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+# STRATA_WINDOWS_PATCH: suppress the windows.h min/max macros that break std::numeric_limits<>::min().
+if(MSVC)
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+endif()
 include(${STRATA_ROOT}/cmake/strata_geometry.cmake)   # -DSTRATA_GEOMETRY=<name> (default flash_next, no flag added)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -133,7 +141,12 @@ list(APPEND _sycl_flags -fsycl-default-sub-group-size=32)
 # split the first launch in the prompt path (the embedding gather) paid 245 ms for the image it shared (2026-09-30).
 list(APPEND _sycl_link -fsycl-device-code-split=per_kernel)
 list(APPEND _sycl_flags -fsycl-device-code-split=per_kernel)
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${_sycl_flags}>" -fp-model=precise -Wno-unused-parameter
+# STRATA_WINDOWS_PATCH: /fp:precise is the clang-cl spelling of -fp-model=precise.
+set(_fp_precise -fp-model=precise)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  set(_fp_precise /fp:precise)
+endif()
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${_sycl_flags}>" ${_fp_precise} -Wno-unused-parameter
                     -Wno-unused-variable -Wno-deprecated-declarations)
 add_link_options(${_sycl_link})
 
@@ -284,6 +297,11 @@ list(APPEND _kernels ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/cuda/qsa_prompt_att
 list(APPEND _kernels ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/cuda/qsa_prompt_attn_esimd.dp.cpp)   # port-only: the int8 DPAS (ESIMD) prompt attention
 list(APPEND _kernels ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/cuda/weight_permute.dp.cpp)
 add_library(strata_kernels STATIC ${_kernels})
+# STRATA_WINDOWS_PATCH: keep multiply/add rounding separate for grouped experts on clang-cl.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/cuda/s2_expert_grouped.dp.cpp
+    PROPERTIES COMPILE_OPTIONS "/clang:-ffp-contract=off")
+endif()
 target_include_directories(strata_kernels PRIVATE ${STRATA_ROOT}/third_party/ggml)
 target_link_libraries(strata_kernels PUBLIC strata_core)
 
@@ -306,8 +324,13 @@ add_library(strata_prefill STATIC ${_prefill}
             ${CMAKE_CURRENT_SOURCE_DIR}/src/prefill/moe_fused_stub.cpp   # upstream's fused int8 kernels: not built here
             ${CMAKE_CURRENT_SOURCE_DIR}/src/prefill/xmx_moe.dp.cpp         # A770 port: grouped XMX expert GEMM
             ${CMAKE_CURRENT_SOURCE_DIR}/src/prefill/esimd_moe.dp.cpp)       # 151-b70: fused int8 DPAS expert products (ESIMD, Battlemage)
-target_compile_options(strata_prefill PUBLIC -qmkl=sequential)
-target_link_options(strata_prefill PUBLIC -qmkl=sequential)
+# STRATA_WINDOWS_PATCH: /Qmkl=sequential is the clang-cl spelling of -qmkl=sequential.
+set(_mkl_sequential -qmkl=sequential)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  set(_mkl_sequential /Qmkl=sequential)
+endif()
+target_compile_options(strata_prefill PUBLIC ${_mkl_sequential})
+target_link_options(strata_prefill PUBLIC ${_mkl_sequential})
 target_link_libraries(strata_prefill PUBLIC strata_engine)
 
 # Optional TLA data movement for exact FP32 sparse prompt attention on B70.
@@ -374,7 +397,19 @@ message(STATUS "Strata SYCL: Battlemage TLA routed experts: ${_expert_tla_enable
 
 strata_resolve(_main src/program/generate.cpp)
 add_executable(strata ${_main})
+if(MSVC)
+  target_sources(strata PRIVATE ${STRATA_ROOT}/cmake/strata-utf8.manifest)
+endif()
 target_link_libraries(strata PRIVATE strata_engine strata_prefill strata_spec)
+
+# --- strata-device: the card list the Windows setup reads (JSON) ------------------------------------------------------
+# The CUDA and HIP builds' strata-device (engine/src/core/device_main.cpp) prints the memory plan, which exists only
+# once a model is loaded.  The Windows Intel component needs a different answer before anything is loaded: which
+# adapter each ordinal of ONEAPI_DEVICE_SELECTOR names, with the VRAM size and the USM capabilities the expert pools
+# require.  setup_windows.py reads this program's stdout as JSON and refuses a package without it, so it ships beside
+# strata.exe and strata-vision.exe.
+add_executable(strata-device src/core/device_info_main.cpp)
+target_link_libraries(strata-device PRIVATE strata_includes)
 
 # --- the kernel parity self-tests (each runs on the card and compares against a CPU reference) ---------------------
 if(STRATA_SYCL_PARITY)   # (the option is declared above, next to STRATA_OWN_CPU_QUANT: it decides whether ggml is configured)
