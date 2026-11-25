@@ -194,7 +194,7 @@ $env:PYTHONPATH = "C:\path\to\upstream\Strata\terminal"
 git remote add upstream https://github.com/Niko1221/Strata.git
 git fetch upstream
 
-# 1. 把移植保存为相对当前基线的补丁（基线即第一个提交的 SHA）
+# 1. 把移植保存为相对当前基线的补丁（基线即导入引擎那个提交的 SHA）
 BASELINE=2af30ccaa0729177c4725ee2073f72bf550e2f86
 git diff $BASELINE..HEAD -- engine tools/packaging > ../port.patch
 test -s ../port.patch || { echo "port.patch is empty, stop"; exit 1; }

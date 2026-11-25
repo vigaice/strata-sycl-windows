@@ -213,7 +213,7 @@ The update is therefore a patch replay, which is why every port change carries t
 git remote add upstream https://github.com/Niko1221/Strata.git
 git fetch upstream
 
-# 1. keep the port as a patch against the current baseline (the first commit's SHA)
+# 1. keep the port as a patch against the current baseline (the import commit's SHA)
 BASELINE=2af30ccaa0729177c4725ee2073f72bf550e2f86
 git diff $BASELINE..HEAD -- engine tools/packaging > ../port.patch
 test -s ../port.patch || { echo "port.patch is empty, stop"; exit 1; }
