@@ -249,17 +249,19 @@ underneath:
   nothing here was tested on Linux.
 - **No AOT comparison.** An AOT build (`-Aot bmg-g21`) was attempted and the compiler stalled; the
   shipped configuration is JIT SPIR-V.
-- **Unsigned component.** A locally built engine component cannot be signed with the upstream key, so the
-  client's `install-file` path rejects it. Copy the directory into
-  `%LOCALAPPDATA%\Strata\components\engine\` instead.
+- **The signature is local, not upstream's.** A locally built component cannot carry the upstream
+  signing key, so it is signed with a key generated on this machine and the public half is added to the
+  client's trust list (`control\strata_control\update_keys.json`). The client then treats it as signed:
+  `strata components engines` reports `signed`, `components use` switches to it, and
+  `components install-file` accepts the zip. Two consequences: a Control component update replaces
+  `update_keys.json` and the trust has to be added again, and another machine rejects the package
+  unless it trusts the same key.
 - **Image conversations were not exercised end to end** through the client; the vision program was
   tested on its own.
 - The numbers in *Tested configuration* come from one machine and one model. They are not a benchmark.
 
 ## License
 
-MIT. `LICENSE` is upstream's file byte for byte (sha256
-`949b9b0aada7476006469e58ee4ffb0e0f68c2d9137e90a356757b61a09d37f0`), not a copy with lines appended.
-`NOTICE` records the baseline, the upstream copyright and the copyright of this branch's port, which
-is what MIT asks of a derived work. "Strata" and the upstream code are copyright Niko1221 and the
-Strata contributors.
+MIT. `LICENSE` keeps upstream's copyright notice unchanged and adds one line for this branch's port,
+which is what MIT asks of a derived work; `NOTICE` records the baseline commit. "Strata" and the
+upstream code are copyright Niko1221 and the Strata contributors.

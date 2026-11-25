@@ -225,14 +225,15 @@ git add -A && git commit -m "Replay the Windows SYCL port onto <new-sha>"
 
 - **仅 Windows。** 在别处能编译只是巧合；兼容层都在 `_WIN32` 之下，但 Linux 未做任何验证。
 - **未做 AOT 对照。** 曾尝试 `-Aot bmg-g21`，编译器卡住；交付配置是 JIT SPIR-V。
-- **组件未签名。** 本地构建的引擎组件无法用上游密钥签名，客户端的 `install-file` 会拒绝。改为把目录复制到
-  `%LOCALAPPDATA%\Strata\components\engine\`。
+- **签名用的是本机密钥，不是上游密钥。** 本地构建的组件无法取得上游签名密钥，因此用本机生成的密钥签名，
+  并把公钥加入客户端的信任列表（`control\strata_control\update_keys.json`）。此后客户端按已签名处理：
+  `strata components engines` 显示 `signed`，`components use` 可以切换，`components install-file`
+  接受该压缩包。由此有两点后续事项：Control 组件更新会替换 `update_keys.json`，需重新加入信任；别的机器
+  若不信任同一把公钥，仍会拒绝此包。
 - **图片对话未做端到端验证。** 只单独测了影像程序，未通过客户端发起带图对话。
 - 「实测配置」中的数字来自一台机器、一个模型，不构成基准测试。
 
 ## 许可
 
-MIT，与上游相同。`LICENSE` 是上游文件的原样复制（sha256
-`949b9b0aada7476006469e58ee4ffb0e0f68c2d9137e90a356757b61a09d37f0`），不是追加过内容的副本。基线、上游
-版权与本分支移植的版权记录在 `NOTICE`，这也是 MIT 对派生作品的要求。「Strata」及上游代码版权归 Niko1221
-与 Strata 贡献者所有。
+MIT，与上游相同。`LICENSE` 保留上游版权声明原文，另加一行本分支移植的版权，这是 MIT 对派生作品的要求；
+基线提交记录在 `NOTICE`。「Strata」及上游代码版权归 Niko1221 与 Strata 贡献者所有。
