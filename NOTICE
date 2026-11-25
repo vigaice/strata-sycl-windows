@@ -1,0 +1,25 @@
+strata-sycl-windows
+===================
+
+This repository contains a derived work of Strata.
+
+Upstream:  https://github.com/Niko1221/Strata
+Baseline:  2af30ccaa0729177c4725ee2073f72bf550e2f86 (2026-11-24)
+Copyright: 2026 Niko1221 and the Strata contributors
+
+The engine sources, the packaging tools and the LICENSE file are upstream's,
+unmodified except for the Windows port marked STRATA_WINDOWS_PATCH.
+
+Port copyright: 2026 vigaice and the strata-sycl-windows contributors.
+The port is released under the same MIT terms as upstream; see LICENSE, which
+is upstream's file byte for byte (sha256
+949b9b0aada7476006469e58ee4ffb0e0f68c2d9137e90a356757b61a09d37f0).
+
+The MIT template that GitHub writes when a repository is created was replaced by
+that file; it survives only in the first commit, not in the tree.
+
+This branch is not an official release and is not affiliated with, endorsed by,
+or supported by the upstream project. "Strata" refers to the upstream project.
+
+Bundled third-party components under engine/third_party/ carry their own
+licenses, in their own directories. Nothing in this NOTICE changes those terms.

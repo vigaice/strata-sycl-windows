@@ -1,0 +1,46 @@
+# Build trees: always out of tree, never committed.
+build*/
+out/
+cmake-build-*/
+
+# Compiler and linker output.
+*.obj
+*.o
+*.a
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+*.dll
+*.exe
+*.so
+*.so.*
+*.dylib
+
+# Logs, patch and backup leftovers.
+*.log
+*.orig
+*.rej
+*.bak
+
+# Models and packs: the engine reads them, this repository does not carry them.
+*.gguf
+*.safetensors
+*.ggml
+
+# Generated SPIR-V and AOT dumps.
+*.spv
+*.spirv
+
+# Python bytecode (tools/packaging).
+__pycache__/
+*.pyc
+
+# Editors and OS.
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+desktop.ini
