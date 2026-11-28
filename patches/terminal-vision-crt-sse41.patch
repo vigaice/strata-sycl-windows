@@ -1,8 +1,7 @@
 diff --git a/terminal/tools/vision/CMakeLists.txt b/terminal/tools/vision/CMakeLists.txt
-index c44c63d5d..952f1bfb7 100644
 --- a/terminal/tools/vision/CMakeLists.txt
 +++ b/terminal/tools/vision/CMakeLists.txt
-@@ -39,7 +39,14 @@ endif()
+@@ -40,7 +40,14 @@
  option(STRATA_VISION_METAL "a Mac: our tower's Metal kernels in the program, so --gpu reads pictures on the Mac's GPU (OFF: CPU only)" ON)
  option(STRATA_PORTABLE "build for other PCs: AVX2 baseline, static MSVC runtime" ON)
  if(STRATA_PORTABLE AND MSVC)
@@ -19,10 +18,9 @@ index c44c63d5d..952f1bfb7 100644
  if(STRATA_PORTABLE)
    message(STATUS "strata-vision: portable build (AVX2 baseline, runs on other PCs)")
 diff --git a/terminal/tools/vision/own/CMakeLists.txt b/terminal/tools/vision/own/CMakeLists.txt
-index 8d9b51ab8..12ede8e6a 100644
 --- a/terminal/tools/vision/own/CMakeLists.txt
 +++ b/terminal/tools/vision/own/CMakeLists.txt
-@@ -113,6 +113,12 @@ else()
+@@ -113,6 +113,12 @@
    set_source_files_properties(cpu_kernels_avx.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX")      # (the SSE4.1 tier needs no flag on x64)
    set_source_files_properties(cpu_kernels_avx2.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
    set_source_files_properties(cpu_kernels_avx512.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX512")

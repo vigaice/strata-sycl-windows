@@ -77,7 +77,13 @@ void qsa_prompt_attn_percell(const float* q, const QsaAttnPools& pools, const in
 #include <cmath>
 #include <chrono>
 #include <stdexcept>
+#ifdef _WIN32
+// STRATA_WINDOWS_PATCH: POSIX mkdir() -> MSVC _mkdir() (single-argument form).
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#else
 #include <sys/stat.h>
+#endif
 #include <tuple>
 #include "strata/prefill/f16_expert_pair.hpp"
 #include <chrono>

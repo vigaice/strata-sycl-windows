@@ -31,6 +31,12 @@ WINDOWS_OS = (
     "userenv.dll", "netapi32.dll", "wininet.dll", "winhttp.dll", "dxgi.dll", "d3d11.dll", "d3d12.dll", "dwmapi.dll",
     "dxcore.dll", "wtsapi32.dll", "ncrypt.dll", "normaliz.dll", "api-ms-win-*.dll", "ext-ms-win-*.dll", "hid.dll",
     "opengl32.dll", "glu32.dll", "wldap32.dll", "authz.dll", "msi.dll", "propsys.dll", "uxtheme.dll", "dnsapi.dll",
+    # STRATA_WINDOWS_PATCH: tbb12.dll (bundled for MKL's SYCL layer) imports WINTRUST.dll, which ships in System32 on every
+    # Windows 10/11. Without it here the packaging check called a correct package incomplete, and --verify refused it.
+    "wintrust.dll",
+    # STRATA_WINDOWS_PATCH: libiomp5md.dll (the OpenMP runtime behind MKL's Intel-thread layer, which the picture reader
+    # links) imports IMAGEHLP.dll, likewise a System32 library on every Windows 10/11.
+    "imagehlp.dll",
 )
 # Installed by the GPU driver into System32 (never redistributable by us): the CUDA driver API, the NVIDIA management library,
 # and the AMD / Intel user-mode driver pieces the driver package owns.

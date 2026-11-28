@@ -190,6 +190,19 @@ inline IntelGpuGen intel_gpu_gen(const sycl::device& d) {
     }
     return IntelGpuGen::Unknown;
 }
+// STRATA_WINDOWS_PATCH: does this GPU fault (and time the job out) when a kernel reads ordinary, pageable
+// host memory?  On Linux the answer comes from the kernel driver: "xe" faults on it, "i915" reads it.
+// Windows has no sysfs, so intel_gpu_driver() is empty there and the xe guard on the PCIe share
+// (generate.cpp, "--pcie-frac") never fired: a B580 (Xe2, WDDM) accepted the default 0.55 share, the GPU
+// read the pageable expert arena and the first verify window hung at layer 0 with the card idle
+// (2026-11-25, 0.1.68).  The silicon is the same Xe2 family the xe driver serves, so Battlemage counts
+// as faulting when no driver name is available.
+inline bool intel_gpu_pageable_host_faults(const sycl::device& d) {
+    const std::string& drv = intel_gpu_driver();
+    if (drv == "xe") return true;
+    if (!drv.empty()) return false;   // i915: a kernel reads ordinary host memory the way it always did
+    return intel_gpu_gen(d) == IntelGpuGen::Battlemage;
+}
 // The Battlemage decode controls of PR #4185 (glorysdj): unset = `bm_default` for a Battlemage device and off for every other
 // device (Arc A-series included); a set value turns the control on ("1") or off ("0") whatever the device, as before. The
 // controls with bm_default=false measured neutral or slower on 2x Arc Pro B65 (IQ3_S): they stay opt-in.

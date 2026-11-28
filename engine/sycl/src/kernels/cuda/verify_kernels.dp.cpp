@@ -28,6 +28,14 @@
 #include <thread>
 #include <vector>
 
+// STRATA_WINDOWS_PATCH: undef OUT — Windows sal.h defines OUT as a SAL macro, which
+// collides with the `template <bool OUT>` parameter in this file (S26 kernels).
+#ifdef _WIN32
+#ifdef OUT
+#undef OUT
+#endif
+#endif
+
 #ifndef STRATA_PLAN_LOCAL
 #define STRATA_PLAN_LOCAL 1   // 0: the original one-thread plan kernel (A/B)
 #endif

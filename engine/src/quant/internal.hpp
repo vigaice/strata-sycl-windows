@@ -34,7 +34,13 @@ inline float ue4m3_formula(uint8_t x) {
     if (x == 0 || x == 0x7F) return 0.0f;
     const int exp = (x >> 3) & 0xF;
     const int man = x & 0x7;
-    const float raw = exp == 0 ? std::ldexp((float) man, -9) : std::ldexp(1.0f + (float) man / 8.0f, exp - 7);
+    // 2^e 由指数位直接构造，与 std::ldexp(x, e) 逐位等价：乘以 2 的整数次幂不产生舍入。
+    // 不用 std::ldexp 的原因：它在这里是静态初始化，某些 icx 版本（如 2026.1）不会把它
+    // 常量折叠，而是留下一次运行期 ldexpf 调用，而本机既没有 CRT 也没有 Intel 数学库导出
+    // 该符号，链接直接报 LNK2019: __imp_ldexpf。
+    const auto pow2i = [](int e) { return f32_from_bits((uint32_t) (e + 127) << 23); };
+    const float raw = exp == 0 ? (float) man * pow2i(-9)
+                               : (1.0f + (float) man * 0.125f) * pow2i(exp - 7);
     return raw * 0.5f;
 }
 struct Ue4m3Table {
