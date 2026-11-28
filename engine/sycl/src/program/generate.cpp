@@ -1,22 +1,3 @@
-// STRATA_WINDOWS_PATCH: Windows CRT/SDK compatibility shims.
-#ifdef _WIN32
-#include <cstring>
-// rpcndr.h defines `small` as a macro, colliding with local variables named small.
-#ifdef small
-#undef small
-#endif
-// GNU memmem() is not in the MSVC CRT; provide an equivalent using std::memchr.
-static inline const void* strata_memmem(const void* hay, size_t hn, const void* needle, size_t nn) {
-    if (nn == 0) return hay;
-    if (nn > hn) return nullptr;
-    const unsigned char* h = static_cast<const unsigned char*>(hay);
-    const unsigned char* n = static_cast<const unsigned char*>(needle);
-    for (size_t i = 0; i + nn <= hn; ++i)
-        if (h[i] == n[0] && std::memcmp(h + i, n, nn) == 0) return h + i;
-    return nullptr;
-}
-#define memmem(h, hn, n, nn) strata_memmem((h), (hn), (n), (nn))
-#endif
 #include "private_mtp_demand.hpp"
 #define DPCT_COMPAT_RT_VERSION 12080
 #include "strata/workload_trace.hpp"
@@ -131,11 +112,6 @@ namespace strata::prefill { void set_nonresident_share(double share); }   // SYC
 #include <io.h>
 
 #include "strata/platform/commit.hpp"   // #5742: commit_available / commit_growth (after windows.h)
-// STRATA_WINDOWS_PATCH: rpcndr.h (pulled in by windows.h) defines `small` as a macro;
-// undef here AFTER all includes so the local variable `small` below compiles.
-#ifdef small
-#undef small
-#endif
 #else
 #include <unistd.h>
 #include <cerrno>
@@ -2888,27 +2864,17 @@ int main(int argc, char **argv) try {
     // faulted address in the CPU's mmap range). Without --stream-experts the experts outside the VRAM cache stay in a
     // pageable arena that the PCIe share (--pcie-frac) hands to the GPU. Recommend, never force: the default share
     // becomes 0 (the CPU computes those misses) and an explicit --pcie-frac is kept with a warning.
-    // Windows (and OpenCL) have no sysfs, so intel_gpu_driver() is "" there and the guard below never fired on a
-    // B580: the default 0.55 share handed the GPU pageable expert blobs and the first verify window hung at layer
-    // 0 with the card idle (2026-11-25, 0.1.68).  intel_gpu_pageable_host_faults() answers from the device itself
-    // when the driver name is unavailable; on Linux nothing changes.
-    const bool pageable_host_faults = [] {
-        if (strata::intel_gpu_driver() == "xe") return true;
-        if (!strata::intel_gpu_driver().empty()) return false;
-        try { return strata::intel_gpu_pageable_host_faults(dpct::get_device(0)); } catch (...) { return false; }
-    }();
-    if (pageable_host_faults && !o.stream_experts) {
+    if (strata::intel_gpu_driver() == "xe" && !o.stream_experts) {
         if (!pcie_explicit) {
             o.pcie_frac = 0.0;
-            std::fprintf(stderr, "strata generate: this GPU faults on pageable host memory (xe / Xe2 without "
-                                 "--stream-experts): --pcie-frac defaults to 0 here (the CPU computes the experts "
-                                 "outside VRAM). Use --stream-experts, as setup configures it, to let the GPU read "
-                                 "a pinned mirror\n");
+            std::fprintf(stderr, "strata generate: xe driver without --stream-experts: the GPU faults on pageable host "
+                                 "memory, so --pcie-frac defaults to 0 here (the CPU computes the experts outside VRAM). "
+                                 "Use --stream-experts, as setup configures it, to let the GPU read a pinned mirror\n");
         } else if (o.pcie_frac > 0.0) {
-            std::fprintf(stderr, "strata generate: WARNING: --pcie-frac %.2f without --stream-experts makes the GPU "
-                                 "read pageable host memory; that page-faulted and hung an Arc Pro B70, and hung a "
-                                 "B580's first verify window on Windows (2026-11-25). Use --stream-experts, as setup "
-                                 "configures it, or --pcie-frac 0\n", o.pcie_frac);
+            std::fprintf(stderr, "strata generate: WARNING: --pcie-frac %.2f on the xe driver without --stream-experts "
+                                 "makes the GPU read pageable host memory; that page-faulted and hung an Arc Pro B70 "
+                                 "(Timedout job, device lost). Use --stream-experts, as setup configures it, or "
+                                 "--pcie-frac 0\n", o.pcie_frac);
         }
     }
     // the canonical Q2_0 pack's CPU kernels are AVX-512 only; a native pack runs on AVX2 CPUs as well

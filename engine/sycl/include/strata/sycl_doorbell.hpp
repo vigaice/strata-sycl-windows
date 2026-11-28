@@ -157,14 +157,7 @@ inline uint32_t spin_bound_for(long env_override, const std::string& driver, boo
     return STRATA_SYCL_SPIN_MAX;
 #else
     if (driver == "xe") return host_waits ? 1000000u : 20000u;
-    // STRATA_WINDOWS_PATCH: the no-sysfs branch (Windows, OpenCL) has the same two situations the xe branch
-    // separates: a stage that waits for the host (CPU-served experts) and one that does not. It used to look
-    // only at `long_drafts`, so a --spec run WITH the MTP layer kept the short 20,000-read bound while the
-    // host served experts - and then threw the window away whenever the CPU pool stalled: "the CPU took
-    // 30 ms, longer than the GPU's wait of 20000 reads; the window was discarded" at window 44 on a B580
-    // (2026-11-25). Same bound as xe when the host is in the loop; the pause is a few hundred microseconds
-    // in the common case, so this costs nothing when it is.
-    if (driver.empty() && battlemage) return (host_waits || long_drafts) ? 2000000u : 20000u;
+    if (driver.empty() && battlemage) return long_drafts ? 2000000u : 20000u;
     return 2000000u;
 #endif
 }

@@ -326,9 +326,19 @@ namespace {
 bool sliced_pin_limit(uint64_t& limit, std::string& why) {
     constexpr uint64_t GiB = 1ull << 30;
     char buf[256];
-    // STRATA_WINDOWS_PATCH: SYCL has no CUDA runtime or portable DXGI adapter LUID query.
-    // Use the same RAM/2 fallback the CUDA build uses when the budget query fails.
-    const std::string err = "SYCL adapter LUID unavailable";
+    int dev = 0;
+    cudaDeviceProp p{};
+    uint64_t budget = 0, usage = 0;
+    std::string err = "no CUDA device properties";
+    if (cudaGetDevice(&dev) == cudaSuccess && cudaGetDeviceProperties(&p, dev) == cudaSuccess &&
+        strata::platform::gpu_shared_memory_budget(p.luid, budget, usage, err)) {
+        limit = budget > usage + 4 * GiB ? budget - usage - 4 * GiB : 0;
+        std::snprintf(buf, sizeof buf, "the GPU's shared-memory budget %.1f GiB - %.1f GiB in use - 4 GiB",
+                      (double) budget / GiB, (double) usage / GiB);
+        why = buf;
+        return true;
+    }
+    (void) cudaGetLastError();
     const uint64_t ram = strata::platform::total_physical_memory();
     if (ram == 0) return false;
     limit = ram / 2 > 8 * GiB ? ram / 2 - 8 * GiB : 0;
