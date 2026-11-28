@@ -6,7 +6,7 @@ Strata 在 Windows 上针对 Intel GPU 的推理引擎：用 MSVC / clang-cl 工
 
 > **这是派生分支，不是官方发布。**
 > 本仓库只包含 [Niko1221/Strata](https://github.com/Niko1221/Strata) 在提交
-> `2af30ccaa0729177c4725ee2073f72bf550e2f86` 上的引擎子树，以及叠在其上的 Windows 移植。与上游项目
+> `4560d03793482ef367294cfbd86a4df8d5679e72` 上的引擎子树，以及叠在其上的 Windows 移植。与上游项目
 > 无隶属关系，未获上游认可，也不由上游提供支持。移植引入的问题请提到本仓库，引擎本身的问题请提到上游。
 
 ## 为什么有这个分支
@@ -27,12 +27,12 @@ clang-cl、动态 CRT、没有 `sysfs`），上游有两处对驱动的假设在
 | | |
 | --- | --- |
 | 上游 | `https://github.com/Niko1221/Strata` |
-| 提交 | `2af30ccaa0729177c4725ee2073f72bf550e2f86` |
-| 上游日期 | 2026-11-24 |
-| 上游版本 | Control 0.1.68 / Terminal 0.2.21.1 |
+| 提交 | `4560d03793482ef367294cfbd86a4df8d5679e72` |
+| 上游日期 | 2026-11-27 |
+| 上游版本 | Control 0.1.70 / Terminal 0.2.23 |
 | 许可 | MIT（见 `LICENSE`） |
 
-导入引擎的那个提交是上游原样的树，紧随其后的提交是移植，因此 `git diff 2af30ccaa..HEAD` 读出来只有
+导入引擎的那个提交是上游原样的树，紧随其后的提交是移植，因此 `git diff 4560d03..HEAD` 读出来只有
 移植。仓库的第一个提交是 GitHub 建仓时自动生成的，其中留下的 LICENSE 模板已由导入提交替换。
 
 ## 仓库内容
@@ -139,22 +139,31 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-sycl-windows.p
 # 1. 把 SYCL / MKL 运行时收集到可执行文件旁（app-local 方式）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-runtime.ps1
 
-# 2. 组装为引擎组件
+# 2. 为第 1 步刚拷进 build-sycl-windows 的厂商 DLL 生成许可说明
+python tools\packaging\add_notices.py build-sycl-windows `
+    --oneapi "C:\Program Files (x86)\Intel\oneAPI"
+
+# 3. 组装为引擎组件
 python tools\packaging\package_engine.py --src build-sycl-windows `
-    --backend sycl --version 0.1.68 --platform windows-x86_64 --arch spir64 `
-    --out out\engine --include strata-device.exe `
+    --backend sycl --version 0.1.70 --platform windows-x86_64 --arch spir64 `
+    --out out\engine --include strata-device.exe --include "licenses/*" `
     --search "C:\Program Files (x86)\Intel\oneAPI\2026.2\bin"
 
-# 3. 校验：应输出 "ok (N files, manifest sha256 ...)"
-python tools\packaging\package_engine.py --verify out\engine\0.1.68-windows-x86_64-sycl
+# 4. 校验：应输出 "ok (N files, manifest sha256 ...)"
+python tools\packaging\package_engine.py --verify out\engine\0.1.70-windows-x86_64-sycl
 ```
 
-有三个参数不能省：`--arch spir64`（SYCL 包不给 arch 会被拒）、`--include strata-device.exe`（影像程序会
-自动带入，设备程序不会）、`--search`（MKL 与 oneAPI 运行时 DLL 不在默认搜索路径上）。
+有四个参数不能省：`--arch spir64`（SYCL 包不给 arch 会被拒）、`--include strata-device.exe`（影像程序会
+自动带入，设备程序不会）、`--include "licenses/*"`、`--search`（MKL 与 oneAPI 运行时 DLL 不在默认搜索
+路径上）。
+
+第 2 步存在的原因是：Windows 包会带 Intel oneAPI 运行时与微软 VC 运行时的 DLL。上游的
+`add_notices.py` 把实际带上的那些列进 `licenses/intel-oneapi.txt` 与 `licenses/microsoft-vc-runtime.txt`；
+`package_engine.py` 自己会补 VC 那一份，Intel 那份不会。不给 `--include`，这两个文件就进不了清单。
 
 一个引擎组件必须同时具备 `strata.exe`、`strata-device.exe`、`strata-vision.exe`，缺任一个客户端都不收。
 
-0.1.68 的构建产物作为附件放在[发布页](https://github.com/vigaice/strata-sycl-windows/releases)，只有需要
+0.1.70 的构建产物作为附件放在[发布页](https://github.com/vigaice/strata-sycl-windows/releases)，只有需要
 改动时才要自己构建。该包用本机密钥签名，说明见「已知限制」。
 
 ### `strata_control` 依赖
@@ -180,9 +189,12 @@ $env:PYTHONPATH = "C:\path\to\upstream\Strata\terminal"
 | 工具链 | oneAPI 2026.2、MSVC 14.44、Ninja |
 | 模型 | Qwen3.8-Flash-Next 的一个微调版（Swift 1.5），IQ3_S |
 
-- 连续 18 轮多轮对话：峰值 RSS 48.9 GB，各轮极差 47 MB，无丢弃窗口，无 `did not finish within` 超时。
-- 解码吞吐 17.5–42.4 tok/s，随草稿接受率（0.232–0.703）变化，不是缺陷。
-- 影像：同图 GPU 与 CPU 的 RMS 为 4.8e-4；两张不同图片的 GPU 间 RMS 为 3.4e-2，相差 71 倍。
+- **0.1.70**，2026-11-28 构建并实测：`strata-device` 在 1.7 秒内列出 B580，`usm_host` 与 `usm_device`
+  均为 true；`strata-vision` 编码测试图用 7–8 秒，输出与 0.1.68 构建的结果逐字节相同，说明影像链路在两版
+  之间没有位移；`strata.exe` 解码 32 个 token，24.7 tok/s，草稿接受率 0.724。
+- **0.1.68**，连续 18 轮多轮对话：峰值 RSS 48.9 GB，各轮极差 47 MB，无丢弃窗口，无
+  `did not finish within` 超时。解码吞吐 17.5–42.4 tok/s，随草稿接受率（0.232–0.703）变化，不是缺陷。
+  影像同图 GPU 与 CPU 的 RMS 为 4.8e-4；两张不同图片的 GPU 间 RMS 为 3.4e-2，相差 71 倍。
 - 三个可执行程序在 14 个环境变量、三项目录的 `PATH`（`组件目录;System32;Windows`）下可运行，即 oneAPI
   已卸载的状态。
 
@@ -198,7 +210,7 @@ git remote add upstream https://github.com/Niko1221/Strata.git
 git fetch upstream
 
 # 1. 把移植保存为相对当前基线的补丁（基线即导入引擎那个提交的 SHA）
-BASELINE=2af30ccaa0729177c4725ee2073f72bf550e2f86
+BASELINE=4560d03793482ef367294cfbd86a4df8d5679e72
 git diff $BASELINE..HEAD -- engine tools/packaging > ../port.patch
 test -s ../port.patch || { echo "port.patch is empty, stop"; exit 1; }
 

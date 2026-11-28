@@ -7,7 +7,7 @@ toolchain, packaged as an engine component the desktop client can load.
 
 > **This is a derived branch, not an official release.**
 > It carries only the engine subtree of [Niko1221/Strata](https://github.com/Niko1221/Strata) at commit
-> `2af30ccaa0729177c4725ee2073f72bf550e2f86`, plus the Windows port on top. It is not affiliated with,
+> `4560d03793482ef367294cfbd86a4df8d5679e72`, plus the Windows port on top. It is not affiliated with,
 > endorsed by, or supported by the upstream project. Bug reports about the port belong here; bugs in the
 > engine itself belong upstream.
 
@@ -31,13 +31,13 @@ Both are fixed here. The rest is mechanical: POSIX file calls, `sal.h` and `rpcn
 | | |
 | --- | --- |
 | Upstream | `https://github.com/Niko1221/Strata` |
-| Commit | `2af30ccaa0729177c4725ee2073f72bf550e2f86` |
-| Upstream date | 2026-11-24 |
-| Upstream version | Control 0.1.68 / Terminal 0.2.21.1 |
+| Commit | `4560d03793482ef367294cfbd86a4df8d5679e72` |
+| Upstream date | 2026-11-27 |
+| Upstream version | Control 0.1.70 / Terminal 0.2.23 |
 | License | MIT (see `LICENSE`) |
 
 The commit that imports the engine is upstream's tree unmodified, and the one after it is the port, so
-`git diff 2af30ccaa..HEAD` reads as the port and nothing else. The repository's first commit is the one
+`git diff 4560d03..HEAD` reads as the port and nothing else. The repository's first commit is the one
 GitHub writes when a repository is created; the import replaces the LICENSE template it leaves behind.
 
 ## What is here
@@ -153,24 +153,34 @@ The defaults are `STRATA_PORTABLE=ON`, `STRATA_SYCL_PARITY=OFF`, JIT, four jobs.
 # 1. collect the SYCL / MKL runtime beside the executables (app-local deployment)
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-runtime.ps1
 
-# 2. package as an engine component
+# 2. write the notices for the vendor DLLs that step 1 just copied into build-sycl-windows
+python tools\packaging\add_notices.py build-sycl-windows `
+    --oneapi "C:\Program Files (x86)\Intel\oneAPI"
+
+# 3. package as an engine component
 python tools\packaging\package_engine.py --src build-sycl-windows `
-    --backend sycl --version 0.1.68 --platform windows-x86_64 --arch spir64 `
-    --out out\engine --include strata-device.exe `
+    --backend sycl --version 0.1.70 --platform windows-x86_64 --arch spir64 `
+    --out out\engine --include strata-device.exe --include "licenses/*" `
     --search "C:\Program Files (x86)\Intel\oneAPI\2026.2\bin"
 
-# 3. verify: expected "ok (N files, manifest sha256 ...)"
-python tools\packaging\package_engine.py --verify out\engine\0.1.68-windows-x86_64-sycl
+# 4. verify: expected "ok (N files, manifest sha256 ...)"
+python tools\packaging\package_engine.py --verify out\engine\0.1.70-windows-x86_64-sycl
 ```
 
-Three arguments are not optional: `--arch spir64` (a SYCL package without an arch is refused),
+Four arguments are not optional: `--arch spir64` (a SYCL package without an arch is refused),
 `--include strata-device.exe` (the vision reader is picked up automatically, the device program is
-not), and `--search` (the MKL and oneAPI runtime DLLs are not on the default search path).
+not), `--include "licenses/*"` and `--search` (the MKL and oneAPI runtime DLLs are not on the default
+search path).
+
+Step 2 is there because a Windows package carries Intel's oneAPI runtime and Microsoft's VC runtime
+DLLs. Upstream's `add_notices.py` writes `licenses/intel-oneapi.txt` and
+`licenses/microsoft-vc-runtime.txt` listing the ones actually held; `package_engine.py` adds the VC one
+by itself, the Intel one it does not. Without the `--include` those files never reach the manifest.
 
 An engine component needs `strata.exe`, `strata-device.exe` and `strata-vision.exe` together; the
 client refuses a package missing any of the three.
 
-A built 0.1.68 package is attached to the
+A built 0.1.70 package is attached to the
 [releases page](https://github.com/vigaice/strata-sycl-windows/releases), so building is only needed to
 change something. It is signed with a local key; see *Known limits*.
 
@@ -198,12 +208,16 @@ One machine, stated so the numbers are not read as a general claim:
 | Toolchain | oneAPI 2026.2, MSVC 14.44, Ninja |
 | Model | a Qwen3.8-Flash-Next fine-tune (Swift 1.5), IQ3_S |
 
-- 18 consecutive multi-turn runs: peak RSS 48.9 GB, spread across runs 47 MB, no discarded windows and
-  no `did not finish within` timeouts.
-- Decode throughput 17.5–42.4 tok/s, tracking draft acceptance (0.232–0.703) rather than any defect.
-- Vision: GPU vs CPU RMS 4.8e-4 on the same image; 3.4e-2 across two different images, a 71× separation.
+- **0.1.70**, built and tested on 2026-11-28: `strata-device` lists the B580 with `usm_host` and
+  `usm_device` both true in 1.7 s; `strata-vision` encodes the test image in 7–8 s and its output is
+  byte-identical to the 0.1.68 build's, so the image path did not move between the two versions;
+  `strata.exe` decodes 32 tokens at 24.7 tok/s with 0.724 draft acceptance.
+- **0.1.68**, 18 consecutive multi-turn runs: peak RSS 48.9 GB, spread across runs 47 MB, no discarded
+  windows and no `did not finish within` timeouts. Decode 17.5–42.4 tok/s, tracking draft acceptance
+  (0.232–0.703) rather than any defect. Vision, same image: GPU vs CPU RMS 4.8e-4; 3.4e-2 across two
+  different images, a 71× separation.
 - The three executables run with 14 environment variables and a three-entry `PATH`
-  (`component dir;System32;Windows`), i.e. with oneAPI uninstalled.
+  (`component dir;System32;Windows`), i.e. with oneAPI uninstalled. Re-checked on 0.1.70.
 
 ## Moving to a newer upstream
 
@@ -218,7 +232,7 @@ git remote add upstream https://github.com/Niko1221/Strata.git
 git fetch upstream
 
 # 1. keep the port as a patch against the current baseline (the import commit's SHA)
-BASELINE=2af30ccaa0729177c4725ee2073f72bf550e2f86
+BASELINE=4560d03793482ef367294cfbd86a4df8d5679e72
 git diff $BASELINE..HEAD -- engine tools/packaging > ../port.patch
 test -s ../port.patch || { echo "port.patch is empty, stop"; exit 1; }
 

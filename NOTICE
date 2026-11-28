@@ -4,7 +4,7 @@ strata-sycl-windows
 This repository contains a derived work of Strata.
 
 Upstream:  https://github.com/Niko1221/Strata
-Baseline:  2af30ccaa0729177c4725ee2073f72bf550e2f86 (2026-11-24)
+Baseline:  4560d03793482ef367294cfbd86a4df8d5679e72 (2026-11-24)
 Copyright: 2026 Niko1221 and the Strata contributors
 
 The engine sources and the packaging tools are upstream's, unmodified except
